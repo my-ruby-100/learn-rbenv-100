@@ -78,6 +78,8 @@ Vagrant.configure("2") do |config|
   # SHELL
   config.vm.provision "shell", inline: "sleep 30"
   config.vm.provision "ansible" do |ansible|
+    ansible.compatibility_mode="2.0"
+    ansible.verbose = true
     ansible.playbook = "playbook.yml"
   end
 end
