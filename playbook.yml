@@ -1,0 +1,80 @@
+---
+- hosts: all
+  become: yes
+  vars:
+    rbenv_user: vagrant
+    rbenv_root: ~/.rbenv
+    ruby_version: 3.2.4
+  environment:
+    https_proxy: http://192.168.56.1:7890
+    http_proxy: http://192.168.56.1:7890
+    all_proxy: socks5://192.168.56.1:7890
+
+  pre_tasks:
+    - apt: update_cache=true cache_valid_time=3600
+
+  tasks:
+  - name: download rbenv-doctor
+    get_url:
+      url: https://github.com/rbenv/rbenv-installer/raw/HEAD/bin/rbenv-doctor
+      dest: "/usr/local/bin/rbenv-doctor"
+      mode: '0755'
+
+  - name: install ruby-build dependencies
+    apt:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - autoconf
+      - patch
+      - build-essential
+      - rustc
+      - libssl-dev
+      - libyaml-dev
+      - libreadline6-dev
+      - zlib1g-dev
+      - libgmp-dev
+      - libncurses5-dev
+      - libffi-dev
+      - libgdbm6
+      - libgdbm-dev
+      - libdb-dev
+      - uuid-dev
+
+  - block:
+    - name: rbenv
+      git: 
+        repo: https://github.com/rbenv/rbenv.git
+        dest: "{{ rbenv_root }}"
+
+    - name: plugins
+      git:
+        repo: "{{ item.url }}"
+        dest: "{{ rbenv_root }}/plugins/{{ item.name }}"
+      with_items:
+        - { name: 'ruby-build', url: 'https://github.com/rbenv/ruby-build.git' }
+        - { name: 'rbenv-china-mirror', url: 'https://github.com/andorchen/rbenv-china-mirror.git' }
+        - { name: 'rbenv-vars', url: 'https://github.com/rbenv/rbenv-vars.git' }
+
+    - name: load rbenv
+      lineinfile:
+        path: ~/.bashrc
+        line: eval "$(~/.rbenv/bin/rbenv init - --no-rehash bash)"          
+
+    - name: "install ruby"
+      shell: $0 -lc "{{ rbenv_root }}/bin/rbenv install --skip-existing {{ ruby_version }}"
+      args:
+        creates: "{{ rbenv_root }}/versions/{{ ruby_version }}"
+      environment:
+        RUBY_CONFIGURE_OPTS: --disable-install-doc --disable-install-rdoc
+
+    - name: set default version
+      lineinfile:
+        path: "{{ rbenv_root }}/version"
+        line: "{{ ruby_version }}"
+        create: true
+        mode: '0644'
+
+
+    become: true
+    become_user: "{{ rbenv_user }}"
